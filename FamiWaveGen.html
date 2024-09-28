@@ -1,0 +1,199 @@
+<!-- FamiWaveGen -->
+<!-- Copyright (c) 2024 Beau Sterling -->
+
+<!-- Permission is hereby granted, free of charge, to any person obtaining a copy -->
+<!-- of this software and associated documentation files (the "Software"), to deal -->
+<!-- in the Software without restriction, including without limitation the rights -->
+<!-- to use, copy, modify, merge, publish, distribute, sublicense, and/or sell -->
+<!-- copies of the Software, and to permit persons to whom the Software is -->
+<!-- furnished to do so, subject to the following conditions: -->
+
+<!-- The above copyright notice and this permission notice shall be included in all -->
+<!-- copies or substantial portions of the Software. -->
+
+<!-- THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR -->
+<!-- IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, -->
+<!-- FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE -->
+<!-- AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER -->
+<!-- LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, -->
+<!-- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE -->
+<!-- SOFTWARE. -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- Allow zooming -->
+    <title>Famimimidi Wavetable Generator</title>
+    <style>
+        body {
+            font-family: 'Press Start 2P', cursive; /* NES-style font */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 20px;
+            background-color: #D0D0D0; /* Light gray for console exterior */
+            color: #FFFFFF; /* White text */
+            zoom: 1; /* Set default zoom level */
+        }
+        h1 {
+            font-size: 28px; /* Smaller title size */
+            margin-bottom: 20px;
+            color: #E60012; /* Nintendo red for title */
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(16, 33px); /* Adjusted cell size */
+            grid-template-rows: repeat(16, 33px); /* Adjusted cell size */
+            gap: 1px;
+            background-color: #444444; /* Dark gray for grid */
+            position: relative;
+            border: 2px solid #C0C0C0; /* Light gray border */
+            border-radius: 5px; /* Optional: rounded corners */
+        }
+        .cell {
+            width: 33px; /* Adjusted width */
+            height: 33px; /* Adjusted height */
+            background-color: #333333; /* Darker gray for cells */
+        }
+        .dark-square {
+            width: 33px; /* Adjusted width */
+            height: 33px; /* Adjusted height */
+            background-color: #FF0000; /* Bright red for dark squares */
+            position: absolute;
+            cursor: pointer;
+            user-select: none;
+            transition: top 0.1s; /* Smooth snap */
+        }
+        .output-container {
+            display: flex; /* Use flexbox to align items */
+            align-items: center; /* Center vertically */
+            margin-top: 10px; /* Space above */
+        }
+        .code-field {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #666666; /* Medium gray for code field */
+            border: 1px solid #C0C0C0; /* Light gray border */
+            border-radius: 5px;
+            white-space: pre; /* Preserve whitespace */
+            width: 90%; /* Fit within the page */
+            max-width: 800px; /* Maximum width */
+            overflow-x: auto; /* Allow horizontal scrolling */
+            color: #FFFFFF; /* White text */
+            font-size: 12px; /* Smaller font size for code field */
+        }
+        button {
+            margin-top: 10px;
+            background-color: #C0C0C0; /* Light gray for buttons */
+            color: #1B1B1B; /* Dark text for contrast */
+            border: none;
+            border-radius: 5px;
+            padding: 10px 20px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #A0A0A0; /* Darker gray on hover */
+        }
+        #copyButton {
+            display: none; /* Initially hide the copy button */
+            margin-left: 10px; /* Space between output and button */
+        }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet"> <!-- NES-style font -->
+</head>
+<body>
+    <h1>Famimimidi Wavetable Generator</h1>
+    <div class="grid" id="grid"></div>
+    <button id="generateButton">Generate SysEx</button>
+    <div class="output-container">
+        <div class="code-field" id="codeField"></div>
+        <button id="copyButton">Copy ByteString</button>
+    </div>
+
+    <script>
+        const grid = document.getElementById('grid');
+        const codeField = document.getElementById('codeField');
+        const generateButton = document.getElementById('generateButton');
+        const copyButton = document.getElementById('copyButton');
+
+        // Initialize squares to represent a full period of a sine wave
+        const amplitude = 7; // Maximum amplitude (row range is 0-15)
+        const frequency = (2 * Math.PI) / 16; // Full period across 16 columns
+
+        for (let col = 0; col < 16; col++) {
+            for (let row = 0; row < 16; row++) {
+                const cell = document.createElement('div');
+                cell.classList.add('cell');
+                grid.appendChild(cell);
+            }
+            const darkSquare = document.createElement('div');
+            darkSquare.classList.add('dark-square');
+            darkSquare.dataset.column = col;
+
+            // Calculate the sine value for the current column
+            const sineValue = Math.sin(col * frequency); // Sine value for this column
+            const rowPosition = Math.round((sineValue + 1) * amplitude); // Adjusting for grid
+
+            darkSquare.dataset.row = rowPosition; // Initialize to calculated row
+
+            // Set the position based on calculated row
+            darkSquare.style.top = `${(15 - rowPosition) * 34}px`; // Adjust for new cell size
+            darkSquare.style.left = `${col * 34}px`; // Adjust for new cell size
+            grid.appendChild(darkSquare);
+            makeDraggable(darkSquare);
+        }
+
+        // Make dark squares draggable
+        function makeDraggable(square) {
+            square.addEventListener('mousedown', (e) => {
+                const col = parseInt(square.dataset.column);
+                const startY = e.clientY;
+                const initialTop = parseInt(square.style.top);
+
+                const onMouseMove = (event) => {
+                    const deltaY = event.clientY - startY;
+                    let newTop = initialTop + deltaY;
+
+                    // Bound the new position within the grid
+                    newTop = Math.max(0, Math.min(15 * 34, newTop)); // Bound to the grid height (0 to 510)
+                    square.style.top = `${newTop}px`;
+                };
+
+                const onMouseUp = () => {
+                    const gridRow = 15 - Math.round(parseInt(square.style.top) / 34); // Adjust for new cell size
+                    // Ensure the square snaps to the grid
+                    square.style.top = `${(15 - gridRow) * 34}px`;
+                    square.dataset.row = gridRow;
+                    document.removeEventListener('mousemove', onMouseMove);
+                    document.removeEventListener('mouseup', onMouseUp);
+                };
+
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup', onMouseUp);
+            });
+        }
+
+        // Generate SysEx string
+        generateButton.addEventListener('click', () => {
+            const positions = [];
+            for (let col = 0; col < 16; col++) {
+                const square = document.querySelector(`.dark-square[data-column="${col}"]`);
+                const row = parseInt(square.dataset.row);
+                const hexPosition = row.toString(16).toUpperCase().padStart(2, '0');
+                positions[col] = hexPosition;
+            }
+            const sysExString = `F0 00 70 7F ${positions.join(' ')} F7`;
+            codeField.textContent = sysExString; // Display SysEx string in code field
+            copyButton.style.display = 'inline'; // Show the copy button
+        });
+
+        // Copy code to clipboard
+        copyButton.addEventListener('click', () => {
+            const text = codeField.textContent;
+            navigator.clipboard.writeText(text); // Copy without alert
+        });
+    </script>
+</body>
+</html>
