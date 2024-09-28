@@ -35,6 +35,7 @@
             background-color: #D0D0D0; /* Light gray for console exterior */
             color: #FFFFFF; /* White text */
             zoom: 1; /* Set default zoom level */
+            user-select: none; /* Prevents text selection for everything */
         }
         h1 {
             font-size: 28px; /* Smaller title size */
@@ -82,6 +83,7 @@
             overflow-x: auto; /* Allow horizontal scrolling */
             color: #FFFFFF; /* White text */
             font-size: 12px; /* Smaller font size for code field */
+            user-select: text; /* Allows text selection only in code field */
         }
         button {
             margin-top: 10px;
@@ -92,6 +94,7 @@
             padding: 10px 20px;
             cursor: pointer;
             font-size: 16px;
+            user-select: none; /* Prevents text selection */
         }
         button:hover {
             background-color: #A0A0A0; /* Darker gray on hover */
@@ -99,6 +102,7 @@
         #copyButton {
             display: none; /* Initially hide the copy button */
             margin-left: 10px; /* Space between output and button */
+            user-select: none; /* Prevents text selection */
         }
     </style>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet"> <!-- NES-style font -->
@@ -117,11 +121,14 @@
         const codeField = document.getElementById('codeField');
         const generateButton = document.getElementById('generateButton');
         const copyButton = document.getElementById('copyButton');
+        let draggingSquare = null;
+        let isDragging = false;
 
         // Initialize squares to represent a full period of a sine wave
         const amplitude = 7; // Maximum amplitude (row range is 0-15)
         const frequency = (2 * Math.PI) / 16; // Full period across 16 columns
 
+        // Initialize grid and squares
         for (let col = 0; col < 16; col++) {
             for (let row = 0; row < 16; row++) {
                 const cell = document.createElement('div');
@@ -142,44 +149,49 @@
             darkSquare.style.top = `${(15 - rowPosition) * 34}px`; // Adjust for new cell size
             darkSquare.style.left = `${col * 34}px`; // Adjust for new cell size
             grid.appendChild(darkSquare);
-            makeDraggable(darkSquare);
         }
 
-        // Make dark squares draggable
-        function makeDraggable(square) {
-            square.addEventListener('mousedown', (e) => {
-                const col = parseInt(square.dataset.column);
-                const startY = e.clientY;
-                const initialTop = parseInt(square.style.top);
+        // Handle mouse events
+        grid.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            moveDarkSquareToMouse(e);
+        });
 
-                const onMouseMove = (event) => {
-                    const deltaY = event.clientY - startY;
-                    let newTop = initialTop + deltaY;
+        grid.addEventListener('mousemove', (e) => {
+            if (isDragging) {
+                moveDarkSquareToMouse(e);
+            }
+        });
 
-                    // Bound the new position within the grid
-                    newTop = Math.max(0, Math.min(15 * 34, newTop)); // Bound to the grid height (0 to 510)
-                    square.style.top = `${newTop}px`;
-                };
+        document.addEventListener('mouseup', () => {
+            isDragging = false; // Ensure dragging stops on mouse up anywhere
+            draggingSquare = null;
+        });
 
-                const onMouseUp = () => {
-                    const gridRow = 15 - Math.round(parseInt(square.style.top) / 34); // Adjust for new cell size
-                    // Ensure the square snaps to the grid
-                    square.style.top = `${(15 - gridRow) * 34}px`;
-                    square.dataset.row = gridRow;
-                    document.removeEventListener('mousemove', onMouseMove);
-                    document.removeEventListener('mouseup', onMouseUp);
-                };
+        // Move dark square to match the mouse position over any part of the cell
+        function moveDarkSquareToMouse(e) {
+            const gridRect = grid.getBoundingClientRect(); // Get grid boundaries
+            const mouseX = e.clientX - gridRect.left; // Get mouse X relative to grid
+            const mouseY = e.clientY - gridRect.top;  // Get mouse Y relative to grid
 
-                document.addEventListener('mousemove', onMouseMove);
-                document.addEventListener('mouseup', onMouseUp);
-            });
+            const col = Math.floor(mouseX / 34); // Calculate column based on mouseX
+            const gridRow = 15 -  Math.max(0, Math.min(15, Math.floor(mouseY / 34))); // Calculate row based on mouseY
+
+            if (col < 0 || col > 15) return; // Prevent movement outside grid bounds
+
+            // Select the dark square for this column
+            draggingSquare = document.querySelector(`.dark-square[data-column="${col}"]`);
+
+            // Move the dark square to the calculated row
+            draggingSquare.style.top = `${(15 - gridRow) * 34}px`;
+            draggingSquare.dataset.row = gridRow; // Update the data-row attribute
         }
 
         // Generate SysEx string
         generateButton.addEventListener('click', () => {
             const positions = [];
             for (let col = 0; col < 16; col++) {
-                const square = document.querySelector(`.dark-square[data-column="${col}"]`);
+                const square = document.querySelector(`.dark-square[data-column="${15-col}"]`);
                 const row = parseInt(square.dataset.row);
                 const hexPosition = row.toString(16).toUpperCase().padStart(2, '0');
                 positions[col] = hexPosition;
