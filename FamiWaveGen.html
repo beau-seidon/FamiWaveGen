@@ -191,7 +191,7 @@
         generateButton.addEventListener('click', () => {
             const positions = [];
             for (let col = 0; col < 16; col++) {
-                const square = document.querySelector(`.dark-square[data-column="${15-col}"]`);
+                const square = document.querySelector(`.dark-square[data-column="${col}"]`);
                 const row = parseInt(square.dataset.row);
                 const hexPosition = row.toString(16).toUpperCase().padStart(2, '0');
                 positions[col] = hexPosition;
